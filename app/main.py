@@ -5,6 +5,14 @@ from typing import Optional
 import asyncio
 from .executor import CodeExecutor
 import os
+import logging
+
+# 配置日志
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+logger = logging.getLogger(__name__)
 
 
 # 配置
@@ -12,6 +20,14 @@ API_KEY = os.getenv("API_KEY", "dify-sandbox")
 MAX_REQUESTS = int(os.getenv("MAX_REQUESTS", "100"))
 MAX_WORKERS = int(os.getenv("MAX_WORKERS", "10"))
 WORKER_TIMEOUT = int(os.getenv("WORKER_TIMEOUT", "15"))
+
+logger.info("=" * 80)
+logger.info("沙箱服务初始化")
+logger.info("配置信息:")
+logger.info("  - 最大请求数: %d", MAX_REQUESTS)
+logger.info("  - 最大工作线程数: %d", MAX_WORKERS)
+logger.info("  - 工作线程超时: %d 秒", WORKER_TIMEOUT)
+logger.info("=" * 80)
 
 app = FastAPI()
 executor = CodeExecutor(timeout=WORKER_TIMEOUT, max_workers=MAX_WORKERS)
@@ -76,7 +92,16 @@ async def health_check():
 
 @app.post("/v1/sandbox/run")
 async def execute_code(request: CodeRequest):
+    logger.info("*" * 80)
+    logger.info("收到代码执行请求")
+    logger.info("语言: %s", request.language)
+    logger.info("启用网络: %s", request.enable_network)
+    if request.preload:
+        logger.info("预加载代码: %s", request.preload[:100] + "..." if len(request.preload) > 100 else request.preload)
+    logger.info("*" * 80)
+    
     if request.language not in ["python3", "nodejs"]:
+        logger.warning("不支持的语言: %s", request.language)
         return {
             "code": -400,
             "message": "unsupported language",
@@ -84,6 +109,15 @@ async def execute_code(request: CodeRequest):
         }
 
     result = await executor.execute(request.code, request.language)
+    
+    logger.info("-" * 80)
+    logger.info("API 响应:")
+    logger.info("成功: %s", result.get("success", False))
+    if result.get("output"):
+        logger.info("输出:\n%s", result["output"])
+    if result.get("error"):
+        logger.warning("错误:\n%s", result["error"])
+    logger.info("*" * 80)
     
     return {
         "code": 0,

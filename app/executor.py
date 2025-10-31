@@ -4,12 +4,26 @@ import io
 import tempfile
 import os
 import subprocess
+import logging
+import traceback
 from contextlib import redirect_stdout, redirect_stderr
 from typing import Dict, Any
 from concurrent.futures import ProcessPoolExecutor
 
+# 配置日志
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+logger = logging.getLogger(__name__)
+
 def _run_python_code_in_process(code: str) -> Dict[str, Any]:
     """在进程中执行Python代码的函数"""
+    logger.info("=" * 60)
+    logger.info("开始执行 Python 代码")
+    logger.info("代码内容:\n%s", code)
+    logger.info("-" * 60)
+    
     stdout_buffer = io.StringIO()
     stderr_buffer = io.StringIO()
     
@@ -17,17 +31,38 @@ def _run_python_code_in_process(code: str) -> Dict[str, Any]:
         with redirect_stdout(stdout_buffer), redirect_stderr(stderr_buffer):
             global_namespace = {}
             exec(code, global_namespace)
+        
+        stdout_output = stdout_buffer.getvalue()
+        stderr_output = stderr_buffer.getvalue()
+        
+        if stdout_output:
+            logger.info("标准输出 (stdout):\n%s", stdout_output)
+        if stderr_output:
+            logger.warning("标准错误 (stderr):\n%s", stderr_output)
+        
+        logger.info("Python 代码执行成功")
+        logger.info("=" * 60)
             
         return {
             "success": True,
-            "output": stdout_buffer.getvalue(),
-            "error": stderr_buffer.getvalue() or None
+            "output": stdout_output,
+            "error": stderr_output or None
         }
     except Exception as e:
+        stdout_output = stdout_buffer.getvalue()
+        if stdout_output:
+            logger.info("标准输出 (stdout):\n%s", stdout_output)
+        
+        # 获取完整的错误堆栈
+        error_traceback = traceback.format_exc()
+        logger.error("Python 代码执行失败: %s", str(e))
+        logger.error("完整错误堆栈:\n%s", error_traceback)
+        logger.info("=" * 60)
+        
         return {
             "success": False,
-            "output": stdout_buffer.getvalue(),
-            "error": str(e)
+            "output": stdout_output,
+            "error": f"{str(e)}\n\nTraceback:\n{error_traceback}"
         }
     finally:
         stdout_buffer.close()
@@ -35,6 +70,11 @@ def _run_python_code_in_process(code: str) -> Dict[str, Any]:
 
 def _run_nodejs_code_in_process(code: str) -> Dict[str, Any]:
     """在进程中执行Node.js代码的函数"""
+    logger.info("=" * 60)
+    logger.info("开始执行 Node.js 代码")
+    logger.info("代码内容:\n%s", code)
+    logger.info("-" * 60)
+    
     try:
         # 创建临时文件来存储JavaScript代码
         with tempfile.NamedTemporaryFile(mode='w', suffix='.js', delete=False) as temp_file:
@@ -54,23 +94,37 @@ def _run_nodejs_code_in_process(code: str) -> Dict[str, Any]:
         # 删除临时文件
         os.unlink(temp_file_path)
         
+        if stdout:
+            logger.info("标准输出 (stdout):\n%s", stdout)
+        if stderr:
+            logger.warning("标准错误 (stderr):\n%s", stderr)
+        
         if process.returncode == 0:
+            logger.info("Node.js 代码执行成功")
+            logger.info("=" * 60)
             return {
                 "success": True,
                 "output": stdout,
                 "error": None
             }
         else:
+            logger.error("Node.js 代码执行失败, 返回码: %d", process.returncode)
+            logger.info("=" * 60)
             return {
                 "success": False,
                 "output": stdout,
                 "error": stderr
             }
     except Exception as e:
+        # 获取完整的错误堆栈
+        error_traceback = traceback.format_exc()
+        logger.error("Node.js 代码执行异常: %s", str(e))
+        logger.error("完整错误堆栈:\n%s", error_traceback)
+        logger.info("=" * 60)
         return {
             "success": False,
             "output": "",
-            "error": str(e)
+            "error": f"{str(e)}\n\nTraceback:\n{error_traceback}"
         }
 
 def check_nodejs_available():
@@ -96,12 +150,14 @@ class CodeExecutor:
 
     async def execute(self, code: str, language: str = "python3") -> Dict[str, Any]:
         try:
+            logger.info("收到代码执行请求 - 语言: %s", language)
             loop = asyncio.get_event_loop()
             
             if language == "python3":
                 executor_func = _run_python_code_in_process
             elif language == "nodejs":
                 if not self.nodejs_available:
+                    logger.error("Node.js 不可用")
                     return {
                         "success": False,
                         "output": "",
@@ -109,6 +165,7 @@ class CodeExecutor:
                     }
                 executor_func = _run_nodejs_code_in_process
             else:
+                logger.error("不支持的语言: %s", language)
                 return {
                     "success": False,
                     "output": "",
@@ -121,17 +178,24 @@ class CodeExecutor:
                 code
             )
             result = await asyncio.wait_for(future, timeout=self.timeout)
+            
+            logger.info("代码执行完成 - 成功: %s", result.get("success", False))
             return result
 
         except asyncio.TimeoutError:
+            logger.error("代码执行超时 (>%d秒)", self.timeout)
             return {
                 "success": False,
                 "output": "",
                 "error": f"代码执行超时 (>{self.timeout}秒)"
             }
         except Exception as e:
+            # 获取完整的错误堆栈
+            error_traceback = traceback.format_exc()
+            logger.error("代码执行异常: %s", str(e))
+            logger.error("完整错误堆栈:\n%s", error_traceback)
             return {
                 "success": False,
                 "output": "",
-                "error": str(e)
+                "error": f"{str(e)}\n\nTraceback:\n{error_traceback}"
             }
