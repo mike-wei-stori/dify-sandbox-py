@@ -17,9 +17,9 @@ logger = logging.getLogger(__name__)
 
 # 配置
 API_KEY = os.getenv("API_KEY", "dify-sandbox")
-MAX_REQUESTS = int(os.getenv("MAX_REQUESTS", "100"))
-MAX_WORKERS = int(os.getenv("MAX_WORKERS", "10"))
-WORKER_TIMEOUT = int(os.getenv("WORKER_TIMEOUT", "15"))
+MAX_REQUESTS = int(os.getenv("MAX_REQUESTS", "1000"))
+MAX_WORKERS = int(os.getenv("MAX_WORKERS", "1000"))
+WORKER_TIMEOUT = int(os.getenv("WORKER_TIMEOUT", "10000"))
 
 logger.info("=" * 80)
 logger.info("沙箱服务初始化")
