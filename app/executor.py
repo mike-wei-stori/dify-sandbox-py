@@ -36,9 +36,9 @@ def _run_python_code_in_process(code: str) -> Dict[str, Any]:
         stderr_output = stderr_buffer.getvalue()
         
         if stdout_output:
-            logger.info("标准输出 (stdout):\n%s", stdout_output)
+            logger.info("标准输出 (stdout) [truncated]:\n%s", stdout_output[:1000] + "..." if len(stdout_output) > 1000 else stdout_output)
         if stderr_output:
-            logger.warning("标准错误 (stderr):\n%s", stderr_output)
+            logger.warning("标准错误 (stderr) [truncated]:\n%s", stderr_output[:1000] + "..." if len(stderr_output) > 1000 else stderr_output)
         
         logger.info("Python 代码执行成功")
         logger.info("=" * 60)
@@ -51,7 +51,7 @@ def _run_python_code_in_process(code: str) -> Dict[str, Any]:
     except Exception as e:
         stdout_output = stdout_buffer.getvalue()
         if stdout_output:
-            logger.info("标准输出 (stdout):\n%s", stdout_output)
+            logger.info("标准输出 (stdout) [truncated]:\n%s", stdout_output[:1000] + "..." if len(stdout_output) > 1000 else stdout_output)
         
         # 获取完整的错误堆栈
         error_traceback = traceback.format_exc()
@@ -95,9 +95,9 @@ def _run_nodejs_code_in_process(code: str) -> Dict[str, Any]:
         os.unlink(temp_file_path)
         
         if stdout:
-            logger.info("标准输出 (stdout):\n%s", stdout)
+            logger.info("标准输出 (stdout) [truncated]:\n%s", stdout[:1000] + "..." if len(stdout) > 1000 else stdout)
         if stderr:
-            logger.warning("标准错误 (stderr):\n%s", stderr)
+            logger.warning("标准错误 (stderr) [truncated]:\n%s", stderr[:1000] + "..." if len(stderr) > 1000 else stderr)
         
         if process.returncode == 0:
             logger.info("Node.js 代码执行成功")

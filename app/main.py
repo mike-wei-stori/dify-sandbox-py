@@ -18,7 +18,15 @@ logger = logging.getLogger(__name__)
 # 配置
 API_KEY = os.getenv("API_KEY", "dify-sandbox")
 MAX_REQUESTS = int(os.getenv("MAX_REQUESTS", "1000"))
-MAX_WORKERS = int(os.getenv("MAX_WORKERS", "1000"))
+# 根据 CPU 核心数动态设置工作线程数，避免过多进程导致 CPU 争抢
+# 默认公式: min(32, (cpu_count * 4))，确保至少有 4 个 worker
+import multiprocessing
+try:
+    cpu_count = multiprocessing.cpu_count()
+except Exception:
+    cpu_count = 1
+default_workers = min(32, cpu_count * 4)
+MAX_WORKERS = int(os.getenv("MAX_WORKERS", str(default_workers)))
 WORKER_TIMEOUT = int(os.getenv("WORKER_TIMEOUT", "10000"))
 
 logger.info("=" * 80)
@@ -114,9 +122,11 @@ async def execute_code(request: CodeRequest):
     logger.info("API 响应:")
     logger.info("成功: %s", result.get("success", False))
     if result.get("output"):
-        logger.info("输出:\n%s", result["output"])
+        output_preview = result["output"][:1000] + "..." if len(result["output"]) > 1000 else result["output"]
+        logger.info("输出 (truncated):\n%s", output_preview)
     if result.get("error"):
-        logger.warning("错误:\n%s", result["error"])
+        error_preview = result["error"][:1000] + "..." if len(result["error"]) > 1000 else result["error"]
+        logger.warning("错误 (truncated):\n%s", error_preview)
     logger.info("*" * 80)
     
     return {
